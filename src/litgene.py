@@ -171,9 +171,8 @@ class FineTunedBERT(nn.Module):
             else:      
                 self.pipeline = nn.Sequential(nn.Linear(self.bert_hidden, 1))
             
-        # Note: changed output shape to 2 (from 1)
         elif task_type.lower() == "unsupervised":
-            self.pipeline = nn.Sequential(nn.Linear(self.bert_hidden, 2))
+            self.pipeline = nn.Sequential(nn.Linear(self.bert_hidden, 1))
 
         else:
             raise ValueError(f"Key Error task_type : {task_type} ")

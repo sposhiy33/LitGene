@@ -14,5 +14,3 @@ python src/run.py \
     --save_model_path "checkpoints/combined_solubility_" \
     --test_split_size 0.15 \
     --val_split_size 0.15
-    
-

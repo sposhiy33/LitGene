@@ -18,8 +18,8 @@ import pickle
 from scipy.stats import spearmanr
 import time
 
-from src.litgene import FineTunedBERT
-from src.utils import get_metrics
+from litgene import FineTunedBERT
+from utils import get_metrics
 
 
 def get_triplet_loss(anchEmbeddings, posEmbeddings, negEmbeddings, margin =0.5):

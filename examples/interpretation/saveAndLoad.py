@@ -53,7 +53,7 @@ def splitDataAndLoadToDevice(X,y,seed,device):
     y_train_ = torch.tensor(y_train, dtype=torch.long).to(device)
     X_test_ = torch.tensor(X_test, dtype=torch.float).to(device)
     y_test_ = torch.tensor(y_test, dtype=torch.long).to(device)
-    
+
     return X_train_, X_test_, y_train_, y_test_
 
 def splitKfAndLoadToDevice(X,y,n_splits,seed,device, to_tensor=True):

@@ -1,3 +1,5 @@
 #data/
 models/
 results/
+checkpoints/
+data/gene_go_triplet.csv

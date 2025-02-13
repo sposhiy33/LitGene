@@ -31,7 +31,7 @@ def parse_parameters(
     # Determine the number of labels based on the task type
     if task_type == "classification":
         n_labels = len(set(genes.Label))
-    elif task_type == "regression":
+    elif task_type == "regression" or task_type == "unsupervised":
         n_labels = 1
     else:
         raise ValueError(f"task_type error: {task_type}")
@@ -94,7 +94,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=50, help="Batch size for training")
     parser.add_argument("--model_name", type=str, default="microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext", help="Pre-trained model name")
     parser.add_argument("--data_path", type=str, default="data/combined_solubility.csv", help="Path to the dataset CSV file")
-    parser.add_argument("--task_type", type=str, choices=["classification", "regression"], default="classification", help="Task type (classification or regression)")
+    parser.add_argument("--task_type", type=str, choices=["classification", "regression", "unsupervised"], default="classification", help="Task type (classification or regression)")
     parser.add_argument("--save_model_path", type=str, default=None, help="Path to save the trained model")
     parser.add_argument("--start_model", type=str, default=None, help="Path to the starting model checkpoint")
     parser.add_argument("--test_split_size", type=float, default=0.15, help="Proportion of the dataset to include in the test split")

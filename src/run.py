@@ -3,7 +3,7 @@ import gc
 import pandas as pd
 from sklearn.metrics import accuracy_score
 from litgene import FineTunedBERT
-from utils import process_data
+from utils import process_data, process_triplet_data
 from train import trainer
 import argparse
 
@@ -38,33 +38,55 @@ def parse_parameters(
 
 
     # Initialize the model
-    starting_point_model = FineTunedBERT(
-        pool=pool,
-        model_name=model_name,
-        gene2vec_flag=False,
-        gene2vec_hidden=200,
-        task_type="unsupervised",  # Note: task_type might need to be set correctly
-        n_labels=1,  # Task type is unsupervised here, but this may need adjustment
-        device=device
-    ).to(device)
+    starting_point_model = None
+    if task_type == "classification" or task_type == "regression":
+        starting_point_model = FineTunedBERT(
+            pool=pool,
+            model_name=model_name,
+            gene2vec_flag=False,
+            gene2vec_hidden=200,
+            task_type="unsupervised",  # Note: task_type might need to be set correctly
+            n_labels=1,  # Task type is unsupervised here, but this may need adjustment
+            device=device
+        ).to(device)
 
-    # Load the model state
-    if start_model:
-        starting_point_model.load_state_dict(torch.load(start_model))
+        # Load the model state
+        if start_model:
+            starting_point_model.load_state_dict(torch.load(start_model))
+    
 
     # Process the data
-    train_loader, val_loader, test_loader = process_data(
-        genes, max_length, batch_size,
-        test_split_size=test_split_size,
-        val_split_size=val_split_size,
-        task_type=task_type,
-        model_name=model_name
-    )
+    if task_type == "classification" or task_type == "regression":
+        train_loader, val_loader, test_loader = process_data(
+            genes, max_length, batch_size,
+            test_split_size=test_split_size,
+            val_split_size=val_split_size,
+            task_type=task_type,
+            model_name=model_name
+        )
+        print(f"Train dataset size: {len(train_loader.dataset)}")
+        print(f"Validation dataset size: {len(val_loader.dataset)}")
+        print(f"Test dataset size: {len(test_loader.dataset)}")
 
-    print(f"Train dataset size: {len(train_loader.dataset)}")
-    print(f"Validation dataset size: {len(val_loader.dataset)}")
-    print(f"Test dataset size: {len(test_loader.dataset)}")
+    elif task_type == "unsupervised":
 
+        train_loader, val_loader, test_loader= process_triplet_data(genes, max_length=max_length,
+                                                            batch_size=batch_size,
+                                                            test_split_size=test_split_size,
+                                                            model_name= model_name)
+        
+
+        print(f"Train dataset size: {len(train_loader.dataset)}")
+        print(f"Validation dataset size: {len(val_loader.dataset)}")
+        print(f"Test dataset size: {len(test_loader.dataset)}")
+
+
+    else:
+        raise ValueError(f"task_type error: {task_type}")
+
+
+
+ 
     # Train the model
     sol_model, history, labels_test, best_pred = trainer(
         epochs=epochs,
@@ -79,8 +101,7 @@ def parse_parameters(
         n_labels=n_labels,
         model_name=model_name,
         load_model=starting_point_model,
-        save_model_path=save_model_path
-    )
+        save_model_path=save_model_path)
 
     return sol_model, history
 
@@ -94,7 +115,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=50, help="Batch size for training")
     parser.add_argument("--model_name", type=str, default="microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext", help="Pre-trained model name")
     parser.add_argument("--data_path", type=str, default="data/combined_solubility.csv", help="Path to the dataset CSV file")
-    parser.add_argument("--task_type", type=str, choices=["classification", "regression", "unsupervised"], default="classification", help="Task type (classification or regression)")
+    parser.add_argument("--task_type", type=str, choices=["classification", "regression", "unsupervised"], default="classification", help="Task type (classification, regression or unsupervised)")
     parser.add_argument("--save_model_path", type=str, default=None, help="Path to save the trained model")
     parser.add_argument("--start_model", type=str, default=None, help="Path to the starting model checkpoint")
     parser.add_argument("--test_split_size", type=float, default=0.15, help="Proportion of the dataset to include in the test split")

@@ -1,9 +1,14 @@
+import re
+import warnings
+from sklearn.discriminant_analysis import StandardScaler
+from sklearn.manifold import TSNE
+from sklearn.preprocessing import MultiLabelBinarizer
 import transformers
 from transformers import XLNetTokenizer, XLNetModel
 from transformers import AutoModel, BertTokenizerFast
 from transformers import AdamW
 
-import torch
+import torch 
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from torch.nn import MSELoss
@@ -13,238 +18,13 @@ import torch.nn.functional as F
 import pandas as pd
 import numpy as np
 import ast
-
+import matplotlib.pyplot as plt
 
 from scipy.stats import spearmanr
 from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score, classification_report
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
-
-def process_interaction_data(genes, max_length=512, batch_size=100,
-                             val_genes = None , test_genes = None, 
-                             test_split_size=0.7, frac =1,
-                             model_name= "bert-base-cased"):
-    
-    
-    
-    if frac < 1:
-        genes = genes.sample(frac=frac) #.reset_index(drop=True)
-        
-    
-    if "xlnet" in model_name:
-        tokenizer = XLNetTokenizer.from_pretrained(model_name)
-
-    else:    
-        tokenizer = BertTokenizerFast.from_pretrained(model_name)
-
-    
-
-    anchor = genes["Anchor"].tolist()
-    positive = genes["Positive"].tolist()
-    negative = genes["Negative"].tolist() 
-    g_index = genes.index.tolist()
-#     g_name = genes["Gene name"].tolist()
-    
-
-    tokens_a = tokenizer.batch_encode_plus(anchor, max_length = max_length,
-                                           padding="max_length", truncation=True)
-
-    tokens_p = tokenizer.batch_encode_plus(positive, max_length = max_length,
-                                           padding="max_length", truncation=True)
-
-    tokens_n = tokenizer.batch_encode_plus(negative, max_length = max_length,
-                                           padding="max_length", truncation=True)
-
-    
-    #'token_type_ids': tokens["token_type_ids"],
-    data = {
-        'input_ids_a': tokens_a["input_ids"],
-        'attention_mask_a': tokens_a["attention_mask"],
-
-        'input_ids_p': tokens_p["input_ids"],
-        'attention_mask_p': tokens_p["attention_mask"],
-
-        'input_ids_n': tokens_n["input_ids"],
-        'attention_mask_n': tokens_n["attention_mask"],
-        
-        "g_index": g_index,
-#         "g_name": g_name,
-#         "labels": labels,
-    }
-    
-    tokens_df = pd.DataFrame(data)
-
-    print(tokens_df.shape)
-
-    if val_genes is not None:
-        val_tokens = tokens_df.loc[val_genes]
-        test_tokens =  tokens_df.loc[test_genes]
-        train_tokens = tokens_df.drop(val_genes+test_genes)
-        
-    else:
-
-        train_tokens, test_tokens = train_test_split(tokens_df, test_size=test_split_size,
-                                                     random_state=42)
-
-        test_tokens, val_tokens = train_test_split(test_tokens,test_size=0.5,
-                                                   random_state=42)
-
-
-    train_tokens = train_tokens.reset_index(drop=True)
-    val_tokens = val_tokens.reset_index(drop=True)
-    test_tokens = test_tokens.reset_index(drop=True)
-
-    print(train_tokens.shape, val_tokens.shape, test_tokens.shape)
-    
-    train_dataset = TensorDataset(
-        torch.tensor(train_tokens["input_ids_a"].tolist()),
-        torch.tensor(train_tokens["attention_mask_a"].tolist()),
-        torch.tensor(train_tokens["input_ids_p"].tolist()),
-        torch.tensor(train_tokens["attention_mask_p"].tolist()),
-        torch.tensor(train_tokens["input_ids_n"].tolist()),
-        torch.tensor(train_tokens["attention_mask_n"].tolist()),
-#         torch.tensor(train_tokens["labels"]),
-        torch.tensor(train_tokens["g_index"])
-    )
-
-    val_dataset = TensorDataset(
-        torch.tensor(val_tokens["input_ids_a"].tolist()) ,
-        torch.tensor(val_tokens["attention_mask_a"].tolist()),        
-        torch.tensor(val_tokens["input_ids_p"].tolist()) ,
-        torch.tensor(val_tokens["attention_mask_p"].tolist()),
-        torch.tensor(val_tokens["input_ids_n"].tolist()) ,
-        torch.tensor(val_tokens["attention_mask_n"].tolist()),
-#         torch.tensor(val_tokens["labels"]),
-        torch.tensor(val_tokens["g_index"])
-    )
-
-    test_dataset = TensorDataset(
-        torch.tensor(test_tokens["input_ids_a"].tolist()),
-        torch.tensor(test_tokens["attention_mask_a"].tolist()),
-        torch.tensor(test_tokens["input_ids_p"].tolist()),
-        torch.tensor(test_tokens["attention_mask_p"].tolist()),
-        torch.tensor(test_tokens["input_ids_n"].tolist()),
-        torch.tensor(test_tokens["attention_mask_n"].tolist()),
-#         torch.tensor(test_tokens["labels"]),
-        torch.tensor(test_tokens["g_index"])
-    )
-
-        
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-    
-    return train_loader, val_loader, test_loader
-
-def process_triplet_data(genes, max_length=512, batch_size=100,
-                         val_genes = None , test_genes = None, 
-                         test_split_size=0.7,
-                         model_name= "bert-base-cased"):
-    
-    
-    seed = np.random.randint(0,1000)
-    if "xlnet" in model_name:
-        tokenizer = XLNetTokenizer.from_pretrained(model_name)
-
-    else:    
-        tokenizer = BertTokenizerFast.from_pretrained(model_name)
-
-    
-    labels = genes["Label"].tolist()
-    anchor = genes["Anchor"].tolist()
-    positive = genes["Positive"].tolist()
-    negative = genes["Negative"].tolist() 
-    g_index = genes.index.tolist()
-    g_name = genes["Gene name"].tolist()
-    
-
-    tokens_a = tokenizer.batch_encode_plus(anchor, max_length = max_length,
-                                           padding="max_length", truncation=True)
-
-    tokens_p = tokenizer.batch_encode_plus(positive, max_length = max_length,
-                                           padding="max_length", truncation=True)
-
-    tokens_n = tokenizer.batch_encode_plus(negative, max_length = max_length,
-                                           padding="max_length", truncation=True)
-
-    
-    #'token_type_ids': tokens["token_type_ids"],
-    data = {
-        'input_ids_a': tokens_a["input_ids"],
-        'attention_mask_a': tokens_a["attention_mask"],
-
-        'input_ids_p': tokens_p["input_ids"],
-        'attention_mask_p': tokens_p["attention_mask"],
-
-        'input_ids_n': tokens_n["input_ids"],
-        'attention_mask_n': tokens_n["attention_mask"],
-        
-        "g_index": g_index,
-        "g_name": g_name,
-        "labels": labels,
-    }
-    
-    tokens_df = pd.DataFrame(data)
-
-
-    if val_genes is not None:
-        val_tokens = tokens_df.loc[val_genes]
-        test_tokens =  tokens_df.loc[test_genes]
-        train_tokens = tokens_df.drop(val_genes+test_genes)
-        
-    else:
-
-        train_tokens, test_tokens = train_test_split(tokens_df, test_size=test_split_size,
-                                                     random_state=seed)
-
-        test_tokens, val_tokens = train_test_split(test_tokens,test_size=0.5,
-                                                   random_state=seed)
-
-
-    train_tokens = train_tokens.reset_index(drop=True)
-    val_tokens = val_tokens.reset_index(drop=True)
-    test_tokens = test_tokens.reset_index(drop=True)
-
-    
-    train_dataset = TensorDataset(
-        torch.tensor(train_tokens["input_ids_a"].tolist()),
-        torch.tensor(train_tokens["attention_mask_a"].tolist()),
-        torch.tensor(train_tokens["input_ids_p"].tolist()),
-        torch.tensor(train_tokens["attention_mask_p"].tolist()),
-        torch.tensor(train_tokens["input_ids_n"].tolist()),
-        torch.tensor(train_tokens["attention_mask_n"].tolist()),
-        torch.tensor(train_tokens["labels"]),
-        torch.tensor(train_tokens["g_index"]))
-
-    val_dataset = TensorDataset(
-        torch.tensor(val_tokens["input_ids_a"].tolist()) ,
-        torch.tensor(val_tokens["attention_mask_a"].tolist()),        
-        torch.tensor(val_tokens["input_ids_p"].tolist()) ,
-        torch.tensor(val_tokens["attention_mask_p"].tolist()),
-        torch.tensor(val_tokens["input_ids_n"].tolist()) ,
-        torch.tensor(val_tokens["attention_mask_n"].tolist()),
-        torch.tensor(val_tokens["labels"]),
-        torch.tensor(val_tokens["g_index"]))
-
-    test_dataset = TensorDataset(
-        torch.tensor(test_tokens["input_ids_a"].tolist()),
-        torch.tensor(test_tokens["attention_mask_a"].tolist()),
-        torch.tensor(test_tokens["input_ids_p"].tolist()),
-        torch.tensor(test_tokens["attention_mask_p"].tolist()),
-        torch.tensor(test_tokens["input_ids_n"].tolist()),
-        torch.tensor(test_tokens["attention_mask_n"].tolist()),
-        torch.tensor(test_tokens["labels"]),
-        torch.tensor(test_tokens["g_index"]))
-
-        
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-    
-    return train_loader, val_loader, test_loader
 
 def plot_latent(latents, labels, epoch, class_map = None, validation_type="train"):
     
@@ -313,17 +93,11 @@ def process_data(genes, max_length, batch_size, val_genes = None , test_genes = 
         
         # Load the gene2vec embeddings from the CSV file
         gene2vec_df = pd.read_csv(gene2vec_file_path)
-
-        # Convert the 'gene2vec' string to a list of floats using ast.literal_eval
         gene2vec_df['gene2vec'] = gene2vec_df['gene2vec'].apply(ast.literal_eval)
-
-        # Create a dictionary from the DataFrame
         Gene2Vec = dict(zip(gene2vec_df['Gene name'].str.strip(), gene2vec_df['gene2vec']))
 
         # Filter the tokens_df to only include genes that are in the Gene2Vec dictionary
         tokens_df = tokens_df[tokens_df['g_name'].isin(Gene2Vec.keys())]
-
-        # Add the gene2vec embeddings to the tokens_df
         tokens_df['gene2vec'] = tokens_df['g_name'].apply(lambda name: Gene2Vec[name])
 
         print(f"Shape of tokens_df after gene2vec:{tokens_df.shape}")
@@ -364,14 +138,6 @@ def process_data(genes, max_length, batch_size, val_genes = None , test_genes = 
 
         test_tokens = test_tokens.reset_index(drop=True)
         train_tokens = train_tokens.reset_index(drop=True)
-            
-
-            
-            
-            
-
-
-        
     
     if gene2vec_flag:
     
@@ -569,11 +335,6 @@ def plot_GO_accuracy_histogram(labels, preds, level=2):
     plt.ylabel('Accuracy')
     plt.title(f'Level {level}: GO Terms')
     plt.xticks(ticks=range(n_classes), labels=[f'{i+1}' for i in range(n_classes)])
-    
-#     for bar, acc in zip(bars, accuracies):
-#         yval = bar.get_height() -0.5
-#         plt.text(bar.get_x() + bar.get_width()/2, yval,
-#                  f'{acc:.2f}', ha='center', va='center', rotation='vertical')
 
     plt.show()
 
@@ -821,8 +582,6 @@ def from_obo_to_triplet(genes,
         else:
             raise ValueError(f"Unknown triplet Value: {triplet}")
     
-
-    
     triplet_data ={
         "Gene name":[],
         "Anchor": [],
@@ -832,8 +591,6 @@ def from_obo_to_triplet(genes,
         "Negative":[],
         "NegativeTerm":[]
     }
-    
-    
     
     if triplet == "gene-wise":
         triplet_data["PositiveGene"]=[]
@@ -865,15 +622,7 @@ def from_obo_to_triplet(genes,
         
 
         
-#     print(len(triplet_data["Gene name"]))
-#     print(len(triplet_data["Anchor"]))
-#     print(len(triplet_data["StrLabel"]))
-#     print(len(triplet_data["Positive"]))
-#     print(len(triplet_data["PositiveTerm"]))
-#     print(len(triplet_data["Negative"]))
-#     print(len(triplet_data["NegativeTerm"]))
-#     print(len(triplet_data["PositiveGene"]))
-#     print(len(triplet_data["NegativeGene"]))
+
     triplet_df = pd.DataFrame(triplet_data)
     triplet_df = triplet_df.dropna().sample(frac=1).reset_index(drop=True)
     
@@ -884,9 +633,7 @@ def from_obo_to_triplet(genes,
 
     
     triplet_df["Label"] = labels.tolist()
-    
-#     labels, class_map = map_strLabels(triplet_df.StrLabel.to_list())
-    
+        
     
     go_terms_df = df = pd.DataFrame(list(termid_to_summary.items()), columns=['TermId', 'Summary'])
     go_terms_df["Label"] = go_terms_df.TermId.apply(lambda t: class_to_int_map[t])
@@ -895,7 +642,8 @@ def from_obo_to_triplet(genes,
 
 def process_triplet_data(genes, max_length=512, batch_size=100,
                          val_genes = None , test_genes = None, 
-                         test_split_size=0.7, gene2vec_flag=False,
+                         test_split_size=0.7, gene2vec_flag=False, 
+                         gene2vec_file_path = 'data/gene2vec_embeddings.csv',
                          model_name= "bert-base-cased"):
     
     
@@ -947,35 +695,26 @@ def process_triplet_data(genes, max_length=512, batch_size=100,
     
     tokens_df = pd.DataFrame(data)
 
-    print(f"Shape of tokens_df before gene2vec:{tokens_df.shape}")
-    
     #############################################
     if gene2vec_flag:
+        print(f"Shape of tokens_df before gene2vec:{tokens_df.shape}")
+
         print("Adding Gene2Vec data ...")
-        
-        Gene2Vec = dict()
 
-        file_path = f'data/gene2vec_embeddings.txt'
-        with open(file_path, 'r') as file:
-            for line in file:
-
-                name, embed = line.strip().split("	")
-                embed = [float(value) for value in embed.split()] 
-
-                Gene2Vec[name.strip()] = embed
-                    
-            
-#         common_genes = set(Gene2Vec.keys()) & (set(tokens_df["g_name"]) | set(tokens_df["PositiveGene"]) | set(tokens_df["NegativeGene"]))
-#         tokens_df = tokens_df[tokens_df['g_name'].isin(common_genes)]
-        
+        # Load the gene2vec embeddings from the CSV file
+        gene2vec_df = pd.read_csv(gene2vec_file_path)
+        gene2vec_df['gene2vec'] = gene2vec_df['gene2vec'].apply(ast.literal_eval)
+        Gene2Vec = dict(zip(gene2vec_df['Gene name'].str.strip(), gene2vec_df['gene2vec']))
+                
+        # Filter the tokens_df to only include genes that are in the Gene2Vec dictionary
         tokens_df["gene2vec_a"] = tokens_df["g_name"].apply(lambda name: Gene2Vec.get(name, None))
         tokens_df["gene2vec_p"] = tokens_df["PositiveGene"].apply(lambda name: Gene2Vec.get(name, None))
         tokens_df["gene2vec_n"] = tokens_df["NegativeGene"].apply(lambda name: Gene2Vec.get(name, None))
         tokens_df = tokens_df.dropna()
+
+        print(f"Shape of tokens_df after gene2vec:{tokens_df.shape}")
     
     #############################################
-    print(f"Shape of tokens_df after gene2vec:{tokens_df.shape}")
-
     
 
     if val_genes is not None:
@@ -1042,7 +781,6 @@ def process_triplet_data(genes, max_length=512, batch_size=100,
             torch.tensor(test_tokens["attention_mask_n"].tolist()),
             torch.tensor(test_tokens["gene2vec_n"]),
             
-#             torch.tensor(test_tokens["labels"]),
             torch.tensor(test_tokens["g_index"]))
     
     else:
@@ -1054,7 +792,6 @@ def process_triplet_data(genes, max_length=512, batch_size=100,
             torch.tensor(train_tokens["attention_mask_p"].tolist()),
             torch.tensor(train_tokens["input_ids_n"].tolist()),
             torch.tensor(train_tokens["attention_mask_n"].tolist()),
-#             torch.tensor(train_tokens["labels"]),
             torch.tensor(train_tokens["g_index"]))
 
         val_dataset = TensorDataset(
@@ -1082,5 +819,5 @@ def process_triplet_data(genes, max_length=512, batch_size=100,
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    
+
     return train_loader, val_loader, test_loader

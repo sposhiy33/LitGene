@@ -171,6 +171,7 @@ class FineTunedBERT(nn.Module):
             else:      
                 self.pipeline = nn.Sequential(nn.Linear(self.bert_hidden, 1))
             
+        
         elif task_type.lower() == "unsupervised":
             self.pipeline = nn.Sequential(nn.Linear(self.bert_hidden, 1))
 
@@ -332,8 +333,8 @@ def getEmbeddings(text,
     return concat_embeddings
 
 def getEmbeddingsWithGene2Vec(dataloader, model, return_preds=True):
-    device_opt = "cuda:0"
-    device = torch.device( device_opt if torch.cuda.is_available() else "cpu")
+    
+    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
         
     embeddings=[]
     preds = []

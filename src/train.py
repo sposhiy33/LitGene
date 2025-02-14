@@ -17,6 +17,8 @@ from tqdm import tqdm
 import pickle
 from scipy.stats import spearmanr
 import time
+from torch.nn import TripletMarginLoss
+
 
 from litgene import FineTunedBERT
 from utils import get_metrics
@@ -769,11 +771,11 @@ def CL_Trainer(
             optimal_loss = epoch_val_loss
             print(f"Best Model was Found at epoch {epoch}.")
             
-            with open(save_model_path+f"pickles/BestModel.pth", 'wb') as file:
-                torch.save(model, file)
+            with open(save_model_path+f"pickles/BestModel.pkl", 'wb') as file:
+                pickle.dump(model, file)
         else:
-            with open(save_model_path+f"pickles/Model{str(epoch)}.pth", 'wb') as file:
-                torch.save(model, file)
+            with open(save_model_path+f"pickles/Model{str(epoch)}.pkl", 'wb') as file:
+                pickle.dump(model, file)
         
         
         print(f'\tET: {(time.time() - start_time):.3f} Seconds')
@@ -969,9 +971,8 @@ def trainer(epochs, train_loader=None, val_loader=None, test_loader=None,
                     best_pred = pred_test
 
                     if save_model_path is not None:
-                        with open(save_model_path+f"best_model.pth", 'wb') as file:
-                            torch.save(model, file)
-                            #pickle.dump(model, file)
+                        with open(save_model_path+f"best_model.pkl", 'wb') as file:
+                            pickle.dump(model, file)
                 
                 
             else:
@@ -980,8 +981,8 @@ def trainer(epochs, train_loader=None, val_loader=None, test_loader=None,
                     best_pred = pred_test
 
                     if save_model_path is not None:
-                        with open(save_model_path+f"best_model.pth", 'wb') as file:
-                            torch.save(model, file)
+                        with open(save_model_path+f"best_model.pkl", 'wb') as file:
+                            pickle.dump(model, file)
             
 
             
@@ -1018,8 +1019,8 @@ def trainer(epochs, train_loader=None, val_loader=None, test_loader=None,
                     best_pred = pred_test
                     
                     if save_model_path is not None:
-                        with open(save_model_path+f"best_model.pth", 'wb') as file:
-                            torch.save(model, file)
+                        with open(save_model_path+f"best_model.pkl", 'wb') as file:
+                            pickle.dump(model, file)
 
             else:
                 if optimal_metric < test_corr:
@@ -1027,8 +1028,8 @@ def trainer(epochs, train_loader=None, val_loader=None, test_loader=None,
                     best_pred = pred_test
                     
                     if save_model_path is not None:
-                        with open(save_model_path+f"best_model.pth", 'wb') as file:
-                            torch.save(model, file)
+                        with open(save_model_path+f"best_model.pkl", 'wb') as file:
+                            pickle.dump(model, file)
 
             
             print(f'\tET: {(time.time() - start_time):.3f} Seconds')

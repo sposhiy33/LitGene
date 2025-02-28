@@ -1,15 +1,15 @@
 # LitGene
-LitGene is a representation-learning based model that enhances gene representation using textual information from scientific literature. Contrastive learning is used to enhace gene embeddings, using similar Gene Ontology (GO) terms to create positive and negative gene pairs. This repository contains the necessary codebase, model weights, and datasets to replicate our training and evaluation of the model. Our study experiments with the use of this model on a multitude of downstream biomedical tasks:
+LitGene is a representation-learning based model that enhances gene representation using textual information from scientific literature. Contrastive learning is used to enhace gene embeddings, using similar Gene Ontology (GO) terms to create positive and negative gene pairs. This repository contains the necessary codebase, model weights, and datasets to replicate our training and evaluation of the model. Our study experiments with the use of this model on a multitude of downstream tasks:
 
-1. Protein Soluability
+1. Protien Solubility
 2. 
 
 
-Links: [[arXiv](https://www.biorxiv.org/content/10.1101/2024.08.07.606674v2.abstract)] [[Interactive Webpage](http://64.106.39.56:5000/)]
+Links: [[BioArXiv](https://www.biorxiv.org/content/10.1101/2024.08.07.606674v2.abstract)] [[Interactive Webpage](http://64.106.39.56:5000/)]
 
-#### Outline
 
 ## Model Weights
+Our contrastive-learning enhanced model can be found in this [Hugging Face repository](https://huggingface.co/tumorailab/LitGene_ContrastiveLearning)
 
 ## Usage
 Pre-reqs: Ensue that Anaconda is installed
@@ -24,12 +24,20 @@ conda env create --name LitGene --file dependencies/conda/requirements.yml
 conda activate LitGene
 ```
 ### Training - Constrastive Learning for Gene Embeddings
-
+```bash
+bash scripts/train_go.sh
+```
 ### Downstream Tasks
+Solubility Prediction:
+```
+bash scripts/combined_solubility.sh
+```
 
 ### Evaluation
 
 ### Interpretability Analysis 
+
+### Custom Task
 
 ## Hyperparameters
 - ```--epochs``` number of epochs
